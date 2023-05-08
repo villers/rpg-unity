@@ -265,6 +265,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 834991003705235842, guid: 072001cfcaa318a4a9a9da4c2de5620e,
         type: 3}
+      propertyPath: level
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 834991003705235842, guid: 072001cfcaa318a4a9a9da4c2de5620e,
+        type: 3}
       propertyPath: attack
       value: 5
       objectReference: {fileID: 0}
@@ -453,14 +458,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 680e93cf9e985f24f845c1d747abeef5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  level: 1
+  level: 10
   health: 0
   maxHealth: 0
   attack: 10
-  defense: 5
+  defense: 1
   attackRange: 2
   attackSpeed: 1
   movementSpeed: 0
+  dodge: 10
+  hit: 90
   baseHealth: 100
   healthPerLevel: 10
   healthPerVitality: 2
@@ -481,12 +488,12 @@ MonoBehaviour:
   criticalChancePerLuck: 10
   baseMovementSpeed: 3
   movementSpeedPerAgility: 50
-  baseDodgeChance: 1
-  dodgeChancePerAgility: 10
+  baseDodge: 1
+  dodgePerAgility: 10
   baseMagicResistance: 0
   magicResistancePerIntelligence: 1
-  baseHitRate: 100
-  hitRatePerDexterity: 1
+  baseHit: 100
+  hitPerDexterity: 1
   baseHpRegeneration: 0.1
   hpRegenerationPerVitality: 1
   baseMpRegeneration: 0.1
@@ -501,9 +508,7 @@ MonoBehaviour:
   experience: 0
   experienceToNextLevel: 10
   criticalChance: 0
-  dodgeChance: 0
   magicResistance: 0
-  hitRate: 0
   hpRegeneration: 0
   mpRegeneration: 0
 --- !u!1 &963194225
