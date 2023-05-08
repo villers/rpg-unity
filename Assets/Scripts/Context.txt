@@ -1,0 +1,530 @@
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\FollowCamera.cs ---
+
+using UnityEngine;
+
+public class FollowCamera : MonoBehaviour
+{
+    public Transform target;
+    public float distance = 10.0f;
+    public float zoomSpeed = 4.0f;
+    public float xSpeed = 250.0f;
+    public float ySpeed = 120.0f;
+    public float yMinLimit = -60f;
+    public float yMaxLimit = 80f;
+
+    private float x = 0.0f;
+    private float y = 0.0f;
+
+    void Start()
+    {
+        Vector3 angles = transform.eulerAngles;
+        x = angles.y;
+        y = angles.x;
+
+        // Make the rigid body not change rotation
+        if (GetComponent<Rigidbody>())
+        {
+            GetComponent<Rigidbody>().freezeRotation = true;
+        }
+    }
+
+    void LateUpdate()
+    {
+        if (target)
+        {
+            distance -= Input.GetAxis("Mouse ScrollWheel") * zoomSpeed;
+
+            if (Input.GetMouseButton(1))
+            {
+                x += Input.GetAxis("Mouse X") * xSpeed * 0.02f;
+                y -= Input.GetAxis("Mouse Y") * ySpeed * 0.02f;
+            }
+
+            y = ClampAngle(y, yMinLimit, yMaxLimit);
+
+            Quaternion rotation = Quaternion.Euler(y, x, 0);
+            Vector3 position = rotation * new Vector3(0.0f, 0.0f, -distance) + target.position;
+
+            transform.rotation = rotation;
+            transform.position = position;
+        }
+    }
+
+    public static float ClampAngle(float angle, float min, float max)
+    {
+        if (angle < -360f)
+            angle += 360f;
+        if (angle > 360f)
+            angle -= 360f;
+        return Mathf.Clamp(angle, min, max);
+    }
+}
+
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\PlayerMovement.cs ---
+
+using UnityEngine;
+using UnityEngine.AI;
+
+public class PlayerMovement : MonoBehaviour
+{
+    public Camera cam;
+    public NavMeshAgent agent;
+
+    private EntityStats characterStats;
+    private EntityStats currentTarget;
+    private float attackTimer = 0.0f;
+
+    void Start()
+    {
+        characterStats = GetComponent<EntityStats>();
+        agent = GetComponent<NavMeshAgent>();
+    }
+
+    void Update()
+    {
+        if (Input.GetMouseButtonDown(0))
+        {
+            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RaycastHit hit;
+
+            if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+            {
+                GameObject hitObject = hit.collider.gameObject;
+                if (hitObject.CompareTag("Enemy"))
+                {
+                    currentTarget = hitObject.GetComponent<EntityStats>();
+                }
+                else
+                {
+                    currentTarget = null;
+                }
+                agent.SetDestination(hit.point);
+            }
+        }
+
+        if (currentTarget != null)
+        {
+            float distanceToTarget = Vector3.Distance(transform.position, currentTarget.transform.position);
+            if (distanceToTarget <= characterStats.attackRange)
+            {
+                agent.isStopped = true;
+                attackTimer -= Time.deltaTime;
+                if (attackTimer <= 0)
+                {
+                    characterStats.Attack(currentTarget);
+                    attackTimer = 1f / characterStats.attackSpeed;
+                }
+            }
+            else
+            {
+                agent.isStopped = false;
+            }
+        }
+        else
+        {
+            agent.isStopped = false;
+        }
+    }
+
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\Entity\DamagePopup.cs ---
+
+using System.Collections;
+using TMPro;
+using UnityEngine;
+
+public class DamagePopup : MonoBehaviour
+{
+    public float duration = 1.0f;
+    public float moveSpeed = 1.0f;
+    public float fadeSpeed = 1.0f;
+
+    private TextMeshPro textMeshPro;
+
+    private void Awake()
+    {
+        textMeshPro = GetComponent<TextMeshPro>();
+    }
+
+    public void Setup(int damage)
+    {
+        Debug.Log(damage);
+        textMeshPro.text = damage.ToString();
+        StartCoroutine(FadeAndDestroy());
+    }
+
+    private IEnumerator FadeAndDestroy()
+    {
+        float timer = 0;
+
+        while (timer < duration)
+        {
+            transform.position += Vector3.up * moveSpeed * Time.deltaTime;
+
+            Color textColor = textMeshPro.color;
+            textColor.a -= fadeSpeed * Time.deltaTime;
+            textMeshPro.color = textColor;
+
+            timer += Time.deltaTime;
+            yield return null;
+        }
+
+        Destroy(gameObject);
+    }
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\Entity\EntityStats.cs ---
+
+using System;
+using TMPro;
+using UnityEngine;
+
+public class EntityStats : MonoBehaviour
+{
+    // Statistiques communes entre les personnages et les monstres
+    public int level;
+    public int health;
+    public int maxHealth;
+    public int attack;
+    public int defense;
+    public float attackRange = 2.0f;
+    public float attackSpeed;
+    public float movementSpeed;
+
+    public event Action<EntityStats> OnEntityDeath;
+
+    // Initialisez les valeurs par d�faut dans Awake() si vous le souhaitez
+    protected virtual void Awake()
+    {
+        // Vous pouvez d�finir ici des valeurs par d�faut pour les statistiques communes
+    }
+
+    protected virtual void Start()
+    {
+        
+    }
+
+
+    // Autres m�thodes communes
+        public void TakeDamage(int damageAmount)
+        {
+            float attackModifier = Mathf.Max(0f, (damageAmount - defense) / 100f + 1f); //calcul du modificateur d'attaque
+            float damage = Mathf.Clamp(damageAmount * attackModifier, 0f, float.MaxValue); //calcul des d�g�ts inflig�s
+            health -= Mathf.RoundToInt(damage); //retrait des points de vie en entiers
+            ShowDamagePopup(Mathf.RoundToInt(damage)); //affichage de la popup de d�g�ts inflig�s
+            if (health <= 0)
+            {
+                OnEntityDeath?.Invoke(this);
+                Die();
+            }
+        }
+    /*
+    public void TakeDamage(int damageAmount)
+    {
+        health -= Mathf.Clamp(damageAmount - defense, 0, int.MaxValue);
+        ShowDamagePopup(damageAmount - defense);
+        if (health <= 0)
+        {
+            OnEntityDeath?.Invoke(this);
+            Die();
+        }
+    }
+    */
+
+    protected virtual void Die()
+    {
+        // Faites quelque chose lorsque l'entit� meurt, par exemple d�truire le GameObject
+        Destroy(gameObject);
+    }
+
+    public void Attack(EntityStats target)
+    {
+        int damage = CalculateDamageDealt();
+        target.TakeDamage(damage);
+    }
+
+    private int CalculateDamageDealt()
+    {
+        // Vous pouvez utiliser une formule pour calculer les d�g�ts inflig�s en fonction des statistiques de l'entit�
+        return attack;
+    }
+
+    // Ajoutez cette m�thode � la classe EntityStats
+    public void ShowDamagePopup(int damage)
+    {
+        // Remplacez "DamagePopupPrefab" par le chemin de votre prefab dans le dossier "Assets"
+        GameObject prefab = Resources.Load<GameObject>("Prefabs/DamagePopup");
+        Renderer renderer = gameObject.GetComponent<Renderer>();
+        Vector3 newPosition = new Vector3(0, renderer.bounds.size.y + 0.2f) + transform.position;
+        GameObject damagePopup = Instantiate(prefab, newPosition, Quaternion.identity);
+
+        damagePopup.GetComponent<DamagePopup>().Setup(damage);
+    }
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\Entity\Mob\EnemyAI.cs ---
+
+using UnityEngine;
+using UnityEngine.AI;
+
+public class EnemyAI : MonoBehaviour
+{
+    public float attackRange = 3.0f;
+    public float attackCooldown = 1.0f;
+    private float attackTimer = 0.0f;
+
+    private NavMeshAgent agent;
+    private EntityStats enemyStats;
+    private GameObject player;
+    private EntityStats playerStats;
+
+    void Start()
+    {
+        agent = GetComponent<NavMeshAgent>();
+        enemyStats = GetComponent<EntityStats>();
+        player = GameObject.FindGameObjectWithTag("Player");
+        playerStats = player.GetComponent<EntityStats>();
+    }
+
+    void Update()
+    {
+        float distanceToPlayer = Vector3.Distance(transform.position, player.transform.position);
+
+        if (distanceToPlayer <= attackRange)
+        {
+            attackTimer -= Time.deltaTime;
+            if (attackTimer <= 0)
+            {
+                enemyStats.Attack(playerStats);
+                attackTimer = attackCooldown;
+            }
+        }
+        else
+        {
+            agent.SetDestination(player.transform.position);
+        }
+    }
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\Entity\Mob\EnemyStats.cs ---
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class EnemyStats : EntityStats
+{
+    // Statistiques sp�cifiques aux monstres
+    public int experienceReward = 10;
+
+    protected override void Awake()
+    {
+        base.Awake();
+        // Vous pouvez d�finir ici des valeurs par d�faut pour les statistiques sp�cifiques aux monstres
+    }
+
+    // Autres m�thodes sp�cifiques aux monstres
+    private void Start()
+    {
+        OnEntityDeath += EnemyStats_OnEntityDeath;
+    }
+
+    private void EnemyStats_OnEntityDeath(EntityStats entityStats)
+    {
+        var playerStats = FindObjectOfType<PlayerMovement>().GetComponent<CharacterStats>();
+        playerStats.GainExperience(experienceReward);
+    }
+
+    private void OnDestroy()
+    {
+        OnEntityDeath -= EnemyStats_OnEntityDeath;
+    }
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\Entity\Mob\HealthBar.cs ---
+
+using UnityEngine;
+using UnityEngine.UI;
+
+public class HealthBar : MonoBehaviour
+{
+    public Slider healthBarSlider;
+    private EntityStats entityStats;
+
+    private void Start()
+    {
+        entityStats = GetComponentInParent<EntityStats>();
+    }
+
+    private void Update()
+    {
+        float healthPercentage = (float)entityStats.health / entityStats.maxHealth;
+        healthBarSlider.value = healthPercentage;
+    }
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\Entity\Player\CharacterStats.cs ---
+
+using System;
+using UnityEngine;
+
+public class CharacterStats : EntityStats
+{
+    public int baseHealth = 100;
+    public int healthPerLevel = 10;
+    public int healthPerVitality = 2;
+
+    public int mana;
+    public int maxMana;
+    public int baseMana = 100;
+    public int manaPerLevel = 10;
+    public int manaPerIntelligence = 5;
+
+    public int baseAttack = 5;
+    public int attackPerLevel = 2;
+    public int attackPerStrength = 1;
+
+    public int baseDefense = 5;
+    public int defensePerLevel = 2;
+    public int defensePerVitality = 1;
+
+    public float baseAttackSpeed = 1.0f;
+    public int attackSpeedPerAgility = 50;
+
+    public float baseCriticalChance = 1.0f;
+    public int criticalChancePerLuck = 10;
+
+    public float baseMovementSpeed = 3.0f;
+    public int movementSpeedPerAgility = 50;
+
+    public float baseDodgeChance = 1.0f;
+    public int dodgeChancePerAgility = 10;
+
+    public int baseMagicResistance = 0;
+    public int magicResistancePerIntelligence = 1;
+
+    public float baseHitRate = 100f;
+    public int hitRatePerDexterity = 1;
+
+    public float baseHpRegeneration = 0.1f;
+    public int hpRegenerationPerVitality = 1;
+
+    public float baseMpRegeneration = 0.1f;
+    public int mpRegenerationPerIntelligence = 1;
+
+    public int strength;
+    public int agility;
+    public int vitality;
+    public int intelligence;
+    public int dexterity;
+    public int luck;
+
+    public int skillPoints;
+    public int experience;
+    public int experienceToNextLevel;
+
+    public float criticalChance;
+    public float dodgeChance;
+    public int magicResistance;
+    public float hitRate;
+    public float hpRegeneration;
+    public float mpRegeneration;
+
+    protected override void Start()
+    {
+        base.Start();
+        experienceToNextLevel = GetExperienceToNextLevel(level);
+        UpdateDerivedStats();
+
+        health = maxHealth;
+        mana = maxMana;
+    }
+
+    public void AddLevel(int points)
+    {
+        level += points;
+    }
+
+    public void AddSkillPoint(int points)
+    {
+        skillPoints += points;
+    }
+
+    public void GainExperience(int expGained)
+    {
+        experience += expGained;
+
+        while (experience >= experienceToNextLevel)
+        {
+            experience -= experienceToNextLevel;
+            AddLevel(1);
+            AddSkillPoint(1);
+            experienceToNextLevel = GetExperienceToNextLevel(level);
+            UpdateDerivedStats();
+        }
+    }
+
+    private int GetExperienceToNextLevel(int currentLevel)
+    {
+        return 100 * currentLevel;
+    }
+
+    private void UpdateDerivedStats()
+    {
+        maxHealth = baseHealth + level * healthPerLevel + vitality * healthPerVitality;
+        maxMana = baseMana + level * manaPerLevel + intelligence * manaPerIntelligence;
+
+        attack = baseAttack + level * attackPerLevel + strength * attackPerStrength;
+        defense = baseDefense + level * defensePerLevel + vitality * defensePerVitality;
+
+        attackSpeed = baseAttackSpeed * (1 + (float)agility / attackSpeedPerAgility);
+        criticalChance = baseCriticalChance + (float)luck / criticalChancePerLuck;
+        movementSpeed = baseMovementSpeed + (float)agility / movementSpeedPerAgility;
+
+        dodgeChance = baseDodgeChance + (float)agility / dodgeChancePerAgility;
+        magicResistance = baseMagicResistance + intelligence * magicResistancePerIntelligence;
+        hitRate = baseHitRate + dexterity * hitRatePerDexterity;
+
+        hpRegeneration = baseHpRegeneration + (float)vitality / hpRegenerationPerVitality;
+        mpRegeneration = baseMpRegeneration + (float)intelligence / mpRegenerationPerIntelligence;
+        // Mettre � jour la vie et la mana actuelles en fonction des nouvelles valeurs maximales
+        health = Mathf.Min(health, maxHealth);
+        mana = Mathf.Min(mana, maxMana);
+    }
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\Entity\Player\PlayerHealthBar.cs ---
+
+using UnityEngine;
+using UnityEngine.UI;
+
+public class PlayerHealthBar : MonoBehaviour
+{
+    public Slider playerHealthSlider;
+    private CharacterStats playerStats;
+
+    private void Start()
+    {
+        playerStats = FindObjectOfType<PlayerMovement>().GetComponent<CharacterStats>();
+    }
+
+    private void Update()
+    {
+        float healthPercentage = (float)playerStats.health / playerStats.maxHealth;
+        playerHealthSlider.value = healthPercentage;
+    }
+}
+--- C:\Users\ville\Projects\Formations\RagnarokMobileGame\Assets\Scripts\utils\extension\GameObjectExtensions.cs ---
+
+using UnityEngine;
+
+public static class GameObjectExtensions
+{
+
+    public static T GetOrAddComponent<T>(this GameObject go) where T : Component
+    {
+        var obj = go.GetComponent<T>();
+        if (obj != null)
+            return obj;
+        return go.AddComponent<T>();
+    }
+
+    public static void ToggleActive(this GameObject go)
+    {
+        go.SetActive(!go.activeInHierarchy);
+    }
+}

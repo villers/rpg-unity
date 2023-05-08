@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 1888581c31c7c994e93117f11c8eae44
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - BGMMixerGroup: {fileID: -7202841186308388819, guid: 7024c467209ed9249bf8399b8b3f19b3,
+      type: 2}
+  - EffectsMixerGroup: {fileID: -4526166432581687483, guid: 7024c467209ed9249bf8399b8b3f19b3,
+      type: 2}
+  - WorldLight: {instanceID: 0}
+  - CursorCamera: {instanceID: 0}
+  - MainCamera: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
