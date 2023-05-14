@@ -9,6 +9,7 @@ public class PlayerMovement : MonoBehaviour
     private EntityStats characterStats;
     private EntityStats currentTarget;
     private float attackTimer = 0.0f;
+    private bool isMouseHeld = false;
 
     void Start()
     {
@@ -18,26 +19,50 @@ public class PlayerMovement : MonoBehaviour
 
     void Update()
     {
+        HandleMouseInput();
+        HandleAttack();
+    }
+
+    private void HandleMouseInput()
+    {
         if (Input.GetMouseButtonDown(0))
         {
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit hit;
+            isMouseHeld = true;
+        }
+        else if (Input.GetMouseButtonUp(0))
+        {
+            isMouseHeld = false;
+        }
 
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+        if (isMouseHeld)
+        {
+            HandleClickOrHold();
+        }
+    }
+
+    private void HandleClickOrHold()
+    {
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+        {
+            GameObject hitObject = hit.collider.gameObject;
+
+            if (hitObject.CompareTag("Enemy") && Input.GetMouseButtonDown(0))
             {
-                GameObject hitObject = hit.collider.gameObject;
-                if (hitObject.CompareTag("Enemy"))
-                {
-                    currentTarget = hitObject.GetComponent<EntityStats>();
-                }
-                else
-                {
-                    currentTarget = null;
-                }
+                currentTarget = hitObject.GetComponent<EntityStats>();
+            }
+            else if (!hitObject.CompareTag("Enemy"))
+            {
+                currentTarget = null;
                 agent.SetDestination(hit.point);
             }
         }
+    }
 
+    private void HandleAttack()
+    {
         if (currentTarget != null)
         {
             float distanceToTarget = Vector3.Distance(transform.position, currentTarget.transform.position);
@@ -61,5 +86,4 @@ public class PlayerMovement : MonoBehaviour
             agent.isStopped = false;
         }
     }
-
 }
